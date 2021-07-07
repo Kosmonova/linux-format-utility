@@ -666,7 +666,7 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 	pshdr_symtab->sh_size = sizeof(Elf32_Sym) * cnt_symbols;
 
 	len += sizeof(Elf32_Sym) * cnt_symbols;
-
+	str_len++;
 	pshdr_strtab->sh_offset = len;
 	pshdr_strtab->sh_size = str_len;
 	elf_buf[len++] = 0;

@@ -1,4 +1,4 @@
-CC	=  gcc-4.8 -D__KERNEL__
+CC	=  gcc -D__KERNEL__
 
 CFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer -pipe 
 

@@ -12,6 +12,7 @@
 #define type_print0(x) case (x): printf("%-"ALIGENT"s", #x); break;
 
 
+
 struct ar_header
 {
 	char file_id[16];
@@ -22,6 +23,124 @@ struct ar_header
 	char file_size[10];
 	char end[2];
 };
+
+/*
+    ********** begin buff **********
+    --------------------------------   Elf32_Ehdr *elfn = buff
+    |  e_type,  e_machine,          |
+    |    . . .                      |
+    |  e_shoff, e_shnum, e_shstrndx |
+    --------------------------------   Elf32_Shdr *pshdr = buff + elfn->e_shoff
+    |                               |  pshdr[1] / ----------------------------
+    --------------------------------- ---------/ | sh_name, sh_type, sh_flags |
+    |                               |  pshdr[2]  | sh_addr, sh_offset         |
+    --------------------------------- ---------\ | sh_size, sh_link, sh_info  |
+    |                               |  pshdr[.] \| sh_addralign, sh_entsize   |
+    ---------------------------------              ---------------------------
+    |                               |  pshdr[e_shnum]
+    ---------------------------------
+    |               .               |
+    |               .               |  char *shstrtab = buff + \
+    |               .               |         pshdr[elfn->e_shstrndx].sh_offset
+    --------------------------------- <-----------------------------
+    |                               |            ---                |
+    |   ".shstrtab" <---------------------------| + | <-------      |
+    |   ".symtab"   <-----------------------     ---          |     |
+    |   ".strtab"   <--------------------   |     ^           |     |
+    |   "..."                       |    |  |     |           |     |
+    ---------------------------------    |  |  shstrtab       |     |
+    |                               |    |  |                 |     |
+    |                           --- |    |  |    ---          |     |
+    ---------------------------------    |   ---| + |<-----   |     |
+    |          ...                  |    |       ---       |  |     |
+    ---------------------------------    |        ^        |  |     |
+    ***********  end buff  ********      |        |        |  |     |
+                                         |     shstrtab    |  |     |
+                                         |                 |  |    ---
+                                         |       ---       |  |   | + |<-- buff
+                                          ------| + |<--   |  |    ---
+                                                 ---    |  |  |     ^
+                                                  ^     |  |  |     |
+                                                  |     |  |  |     |
+    ********** begin pshdr ********           shstrtab  |  |  |     |
+     pshdr[x]                                           |  |  |     |
+     ------------------------                           |  |  |     |
+    | sh_name                |                          |  |  |     |
+    | sh_offset              |                          |  |  |     |
+    | ....                   |                          |  |  |     |
+     ------------------------      ---                  |  |  |     |
+                          buff -->|   |                 |  |  |     |
+     pshdr[x]                   ->| + | -> char *strtab |  |  |     |
+     ------------------------  |  |   |                 |  |  |     |
+    | sh_offset >--------------    --                   |  |  |     |
+    | sh_name    >--------------------------------------   |  |     |
+    | sh_type == SHT_STRTAB  |                             |  |     |
+    | ....                   |                             |  |     |
+     ------------------------                              |  |     |
+                                                           |  |     |
+     const Elf32_Shdr *symtab = pshdr[x]                   |  |     |
+     ------------------------                              |  |     |
+    | sh_name    >-----------------------------------------   |     |
+    | sh_type == SHT_SYMTAB  |                                |     |
+    | ....                   |                                |     |
+     ------------------------                                 |     |
+                                                              |     |
+     pshdr[e_shstrndx]                                        |     |
+     -------------------------                                |     |
+    | sh_name    >--------------------------------------------      |
+    | sh_offset  >--------------------------------------------------
+    | ....                    |
+     -------------------------
+               .
+               .
+               .
+
+     pshdr[e_shnum]
+     -------------------------
+    | sh_name                 |
+    | ....                    |
+     -------------------------
+    *********** end pshdr *********
+
+
+
+    ******** begin string symbols *******
+     ------------------------------ <------- strtab      ---
+    | "nameVal1" <--------------------------------------| + |<----------
+    | "nameVal2" <---------------------------------      ---            |
+    | "..."                        |               |      ^             |
+     ------------------------------                |      |             |
+    ********* end string symbols ********          |    strtab          |
+                                                   |                    |
+                                                   |     ---            |
+                                                    ----| + |<-------   |
+                                                         ---         |  |
+                                                          ^          |  |
+                                                          |          |  |
+                                                        strtab       |  |
+                                                                     |  |
+                                                                     |  |
+                                                                     |  |
+    ******** begin psymbols *******                                  |  |
+                                    Elf32_Sym *psymbols = \          |  |
+     psymbols[x]                          buff + symtab->sh_offset   |  |
+     ------------------------------<--------------------             |  |
+    | st_value, st_size, st_info  |                                  |  |
+    | st_name >------------------------------------------------------   |
+    | ..........                  |                                     |
+     ------------------------------                                     |
+               .                                                        |
+               .                                                        |
+               .                                                        |
+     psymbols[symtab->sh_size / symtab->sh_entsize]                     |
+     ------------------------------<--------------------                |
+    | st_value, st_size, st_info  |                                     |
+    | st_name >---------------------------------------------------------
+    | ..........                  |
+     ------------------------------
+    ******** end psymbols *********
+
+   */
 
 void dump_elf(char *buff, int len_elf)
 {
@@ -52,7 +171,7 @@ void dump_elf(char *buff, int len_elf)
 	int idx_entry = 0;
 	
 	char *shstrtab = (char *)(buff + pshdr[elfn->e_shstrndx].sh_offset);
-	char *strtab = (char *)(buff + pshdr[elfn->e_shstrndx + 2].sh_offset);
+	char *strtab = NULL;
 	const Elf32_Shdr *symtab = NULL, *reltab_text = NULL, * reltab_data = NULL;
 
 	int no_rel_sect = 0;
@@ -91,6 +210,10 @@ void dump_elf(char *buff, int len_elf)
 	{
 		if(pshdr[idx_entry].sh_type == SHT_SYMTAB)
 			symtab= pshdr + idx_entry;
+
+		if(pshdr[idx_entry].sh_type == SHT_STRTAB &&
+			elfn->e_shstrndx != idx_entry)
+				strtab = (char *)(buff + pshdr[idx_entry].sh_offset);
 
 		printf("  [%-2d] %-18s", idx_entry, shstrtab + pshdr[idx_entry].sh_name);
 
