@@ -65,7 +65,7 @@ void dump_ack(char *buff, int len)
 		}
 	}
 
-	position_ack += head.oh_nsect * sizeof(struct outsect);
+	position_ack = OFF_EMIT(head);
 
 	printf("\ncode:\n");
 	for(idx = 0; idx < ntext; idx++)
@@ -109,7 +109,6 @@ void dump_ack(char *buff, int len)
 		chars[idx] = buff + p_outname->on_foff;
 	}
 
-	position_ack += head.oh_nname * sizeof(struct outname);
 	printf("chars:\n");
 	for(idx = 0; idx < head.oh_nname; idx++)
 	{

@@ -85,36 +85,37 @@ int cat_symbol(char *start_head, int offset_sym_h, char *name_symbol,
 // 	for( idx = 0; idx < size; idx++ )
 // 		reloc[rev_reloc[ idx ]] = idx;
 // }
-// 
-// int strip_syms(char *aout_buf, struct exec obj)
-// {
-// 	int cnt_syms_aout = obj.a_syms/sizeof(struct nlist);
-// 	int idx_sym;
-// 
-// 	struct nlist * const paout_syms = (struct nlist *)(aout_buf + N_SYMOFF(obj));
-// 
+
+int strip_syms(char *ack_buf, struct outhead *p_head)
+{
+	int cnt_syms_ack = p_head->oh_nname;
+	int idx_sym;
+
+	struct outname * const pack_syms =
+		(struct outname *)(ack_buf + OFF_NAME(*p_head));
+
 // 	struct relocation_info * const prel_info_text = 
-// 		(struct relocation_info *)(aout_buf + N_TRELOFF(obj));
+// 		(struct relocation_info *)(ack_buf + N_TRELOFF(obj));
 // 
 // 	struct relocation_info *const prel_info_data =
-// 		(struct relocation_info *)(aout_buf + N_DRELOFF(obj));
-// 
-// 	for( idx_sym = 0; idx_sym < cnt_syms_aout; )
-// 	{
-// 		struct nlist *p_sym = paout_syms + idx_sym;
-// 		char *strx = aout_buf + N_STROFF(obj) + p_sym->n_un.n_strx;
-// 
+// 		(struct relocation_info *)(ack_buf + N_DRELOFF(obj));
+
+	for( idx_sym = 0; idx_sym < cnt_syms_ack; )
+	{
+		struct outname *p_sym = pack_syms + idx_sym;
+		char *strx = ack_buf + p_sym->on_foff;
+
 // 		if(strstr(strx, ".o"))
 // 		{
 // 			p_sym->n_type = N_ABS;
 // 		}
-// 			
-// 		if(!strcmp(strx, "gcc2_compiled.") || 
-// 			!strcmp(strx, "___gnu_compiled_c"))
-// 		{
-// 			int idx_syms_rel = 0;
-// 			int cnt_syms_rel = obj.a_trsize / sizeof(struct relocation_info);
-// 	
+			
+		if(!strcmp(strx, "gcc2_compiled.") || 
+			!strcmp(strx, "___gnu_compiled_c"))
+		{
+			int idx_syms_rel = 0;
+			// int cnt_syms_rel = obj.a_trsize / sizeof(struct relocation_info);
+	
 // 			for( idx_syms_rel = 0; idx_syms_rel < cnt_syms_rel; idx_syms_rel++)
 // 			{
 // 				struct relocation_info * const psym_rel = prel_info_text + idx_syms_rel;
@@ -134,31 +135,31 @@ int cat_symbol(char *start_head, int offset_sym_h, char *name_symbol,
 // 			}
 // 			
 // 			int idx_sym1;
-// 			for( idx_sym1 = idx_sym; idx_sym1 < cnt_syms_aout; idx_sym1++)
+// 			for( idx_sym1 = idx_sym; idx_sym1 < cnt_syms_ack; idx_sym1++)
 // 			{
 // 				struct nlist *p_sym1 = paout_syms + idx_sym1;
 // 				*p_sym1 = *(p_sym1 + 1);
 // 			}
+
+			--cnt_syms_ack;
+
+			continue;
+		}
+
+		idx_sym++;
+	}
+	
+	return cnt_syms_ack;
+}
 // 
-// 			--cnt_syms_aout;
-// 
-// 			continue;
-// 		}
-// 
-// 		idx_sym++;
-// 	}
-// 	
-// 	return cnt_syms_aout;
-// }
-// 
-// Elf32_Sym *find_sym_by_addr(unsigned long addr, char *aout_buf, struct exec obj, 
+// Elf32_Sym *find_sym_by_addr(unsigned long addr, char *ack_buf, struct exec obj, 
 // 							Elf32_Sym * const psymbols)
 // {
-// 	int cnt_syms_aout = obj.a_syms/sizeof(struct nlist);
-// 	struct nlist * const paout_syms = (struct nlist *)(aout_buf + N_SYMOFF(obj));
+// 	int cnt_syms_ack = obj.a_syms/sizeof(struct nlist);
+// 	struct nlist * const paout_syms = (struct nlist *)(ack_buf + N_SYMOFF(obj));
 // 	int idx_sym;
 // 	
-// 	for( idx_sym = 0; idx_sym < cnt_syms_aout; idx_sym++)
+// 	for( idx_sym = 0; idx_sym < cnt_syms_ack; idx_sym++)
 // 	{
 // 		struct nlist *p_sym = paout_syms + idx_sym;
 // 
@@ -206,12 +207,12 @@ void usage()
 	exit(-1);
 }
 
-int check_obj_src(char *aout_buf)
+int check_obj_src(char *ack_buf)
 {
-// 	struct exec *obj = (struct exec *)aout_buf;
-// 	struct nlist * const paout_syms = (struct nlist *)(aout_buf + N_SYMOFF(*obj));
+// 	struct exec *obj = (struct exec *)ack_buf;
+// 	struct nlist * const paout_syms = (struct nlist *)(ack_buf + N_SYMOFF(*obj));
 // 	struct nlist *p_sym = paout_syms + 1;
-// 	char *strx = aout_buf + N_STROFF(*obj) + p_sym->n_un.n_strx;
+// 	char *strx = ack_buf + N_STROFF(*obj) + p_sym->n_un.n_strx;
 // 	printf("check_obj_src %s \n", strx);
 // 
 // 	if(!strcmp(strx, "gcc2_compiled."))
@@ -223,11 +224,11 @@ int check_obj_src(char *aout_buf)
 		return 1;
 }
 
-int convert(char *elf_buf, char *aout_buf, int *len_elf)
+int convert(char *elf_buf, char *ack_buf, int *len_elf)
 {
 	int len = 0, off_text = 0, off_data = 0, off_bss = 0, off_strtab = 0;
 	sh_name_h = INIT_SH_NAME_H;
-	struct outhead head =*((struct outhead *)aout_buf);
+	struct outhead head =*((struct outhead *)ack_buf);
 	int ntext = 0;
 	int ndata = 0;
 	int nbss = 0;
@@ -239,7 +240,7 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 
 	int sect_offset = OFF_SECT(head);
 
-	struct outsect *osects = sect_offset + aout_buf;
+	struct outsect *osects = sect_offset + ack_buf;
 
 	int idx = 0;
 	for(idx = 0; idx < head.oh_nsect; idx++)
@@ -303,7 +304,7 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 
 	if(ntext)
 	{
-		memcpy(elf_buf + len, aout_buf + text_offset, ntext);
+		memcpy(elf_buf + len, ack_buf + text_offset, ntext);
 		len += ntext;
 		diff_text = len % 0x10;
               
@@ -319,7 +320,7 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 
 	if(ndata)
 	{
-		memcpy(elf_buf + len, aout_buf + data_offset, ndata);
+		memcpy(elf_buf + len, ack_buf + data_offset, ndata);
 		len += ndata;
 		diff_data = len % 0x10;
 
@@ -332,10 +333,10 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 	}
 
 	// const struct relocation_info *prel_info_text = 
-	// 	(struct relocation_info *)(aout_buf + N_TRELOFF(obj));
+	// 	(struct relocation_info *)(ack_buf + N_TRELOFF(obj));
  // 
 	// const struct relocation_info *prel_info_data =
-	// 	(struct relocation_info *)(aout_buf + N_DRELOFF(obj));
+	// 	(struct relocation_info *)(ack_buf + N_DRELOFF(obj));
 
 	char *start_head = elf_buf + len;
 	off_strtab = len;
@@ -496,18 +497,17 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 		.sh_type = SHT_STRTAB,
 	};
 
-// 	int obj_is_from_asm = check_obj_src(aout_buf);
-	// int idx = 0;
-	int str_len = 0;
+// 	int obj_is_from_asm = check_obj_src(ack_buf);
+	int str_len = head.oh_nchar;
 
-	struct nlist * const paout_syms = (struct nlist *)(aout_buf + N_SYMOFF(obj));
+	struct outname * const pack_syms =
+		(struct outname *)(ack_buf + OFF_NAME(head));
 
-	for( idx = 0; idx < obj.a_syms/sizeof(struct nlist); idx++)
+	for( idx = 0; idx < head.oh_nname; idx++)
 	{
-		struct nlist *p_sym = paout_syms + idx;
+		struct outname *p_outname = pack_syms + idx;
 // 		printf("%08lx ", p_sym->n_value);
-// 		char *strx = aout_buf + N_STROFF(obj) + p_sym->n_un.n_strx;
-// 		str_len += strlen(strx);
+		char *strx = ack_buf + p_outname->on_foff;
 // 
 // 		if(obj_is_from_asm && 
 // 			((p_sym->n_type & N_TYPE) != N_UNDF || p_sym->n_value) &&
@@ -526,30 +526,42 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 	}
 	
 // 	int reloc[obj.a_syms/sizeof(struct nlist)];
-// 	const int cnt_syms_aout =  strip_syms(aout_buf, obj);
+	const int cnt_syms_ack =  strip_syms(ack_buf, &head);
 // 
 	char string_names[str_len];
 	memset(string_names, 0, str_len);
 	char *pstr_names = string_names;
 // 
-// 	sort_aout_sym(paout_syms, cnt_syms_aout, reloc);
-// 
-// 	for( idx = 0; idx < cnt_syms_aout; idx++)
-// 	{
-// 		struct nlist *p_sym = paout_syms + idx;
-// 		char *strx = aout_buf + N_STROFF(obj) + p_sym->n_un.n_strx;
+// 	sort_aout_sym(paout_syms, cnt_syms_ack, reloc);
+
+	for( idx = 0; idx < head.oh_nname; idx++)
+	{
+		struct outname * pack_outname = pack_syms + idx;
+		char *strx = ack_buf + pack_outname->on_foff;
 // 
 // 		if(obj_is_from_asm && 
 // 			((p_sym->n_type & N_TYPE) != N_UNDF || p_sym->n_value) &&
 // 			(~p_sym->n_type & N_EXT));
 // 		else if(strx[0] == '_')
 // 			strx++;
-// 
-// 		strcpy(pstr_names, strx);
-// 		printf("\t%s \n", pstr_names);
-// 		pstr_names += strlen(strx) + 1;
-// 	}
-// 
+
+		if(strcmp(strx, ".text") == 0)
+			continue;
+
+		if(strcmp(strx, ".rom") == 0)
+			continue;
+
+		if(strcmp(strx, ".data") == 0)
+			continue;
+
+		if(strcmp(strx, ".bss") == 0)
+			continue;
+
+		strcpy(pstr_names, strx);
+		printf("\t%s \n", pstr_names);
+		pstr_names += strlen(strx) + 1;
+	}
+
 	Elf32_Sym *psymbols = (Elf32_Sym *)(elf_buf + len);
 	
 	memset(psymbols, 0, sizeof(Elf32_Sym) * 4);
@@ -582,32 +594,47 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 	int first_glob_pos = cnt_symbols;
 	int last_sect_sym = cnt_symbols;
 	int pos_name = 0;
-	// int adr_reloc[cnt_syms_aout];
-	// int rev_adr_reloc[cnt_syms_aout];
-	// sort_aout_sym_by_addr(paout_syms, cnt_syms_aout, adr_reloc);
+	// int adr_reloc[cnt_syms_ack];
+	// int rev_adr_reloc[cnt_syms_ack];
+	// sort_aout_sym_by_addr(paout_syms, cnt_syms_ack, adr_reloc);
 
-// 	for( idx = 0; idx < cnt_syms_aout; idx++)
+// 	for( idx = 0; idx < cnt_syms_ack; idx++)
 // 		rev_adr_reloc[adr_reloc[idx]] = idx;
-// 	
-// 	for( idx = 0; idx < cnt_syms_aout; idx++)
-// 	{
-// 		struct nlist * const paout_sym = paout_syms + idx;
-// 		Elf32_Sym *psymbol = psymbols + cnt_symbols + idx;
-// 		*psymbol = (Elf32_Sym)
-// 		{
-// 			.st_shndx = 1,
-// 			.st_value = paout_sym->n_value,
-// 		};
-// 
-// 		int bind = paout_sym->n_type & N_EXT ? STB_GLOBAL : STB_LOCAL;
-// 			
-// 		if(bind == STB_LOCAL)
-// 			first_glob_pos++;
-// 		
-// 		pos_name++;
-// 		psymbol->st_name = pos_name;
-// 		pos_name += strlen(string_names + pos_name) + 1;
-// 
+	
+	for( idx = 0; idx < cnt_syms_ack; idx++)
+	{
+		struct outname * const pack_sym = pack_syms + idx;
+		
+		char *strx = ack_buf + pack_sym->on_foff;
+		if(strcmp(strx, ".text") == 0)
+			continue;
+
+		if(strcmp(strx, ".rom") == 0)
+			continue;
+
+		if(strcmp(strx, ".data") == 0)
+			continue;
+
+		if(strcmp(strx, ".bss") == 0)
+			continue;
+		
+
+		Elf32_Sym *psymbol = psymbols + cnt_symbols + idx;
+		*psymbol = (Elf32_Sym)
+		{
+			.st_shndx = 1,
+			// .st_value = paout_sym->n_value,
+		};
+
+		int bind = pack_sym->on_type & S_EXT ? STB_GLOBAL : STB_LOCAL;
+			
+		if(bind == STB_LOCAL)
+			first_glob_pos++;
+		
+		pos_name++;
+		psymbol->st_name = pos_name;
+		pos_name += strlen(string_names + pos_name) + 1;
+
 // 		switch(paout_sym->n_type & N_TYPE)
 // 		{
 // 			case N_UNDF:
@@ -632,11 +659,11 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 // 				psymbol->st_shndx = SHN_ABS;
 // 			break;
 // 			case N_TEXT:
-// 				psymbol->st_info = ELF32_ST_INFO(bind, STT_FUNC);
+				psymbol->st_info = ELF32_ST_INFO(bind, STT_FUNC);
 // 				if(sh_name_h.idx_text != -1)
 // 					psymbol->st_shndx = sh_name_h.idx_text;
 // 				
-// 				if(rev_adr_reloc[idx] < cnt_syms_aout - 1)
+// 				if(rev_adr_reloc[idx] < cnt_syms_ack - 1)
 // 					psymbol->st_size = 
 // 					(paout_syms + adr_reloc[rev_adr_reloc[idx]+1])->n_value - paout_sym->n_value;
 // 				else
@@ -648,7 +675,7 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 // 				if(sh_name_h.idx_data != -1)
 // 					psymbol->st_shndx = sh_name_h.idx_data;
 // 
-// 				if(rev_adr_reloc[idx] < cnt_syms_aout - 1)
+// 				if(rev_adr_reloc[idx] < cnt_syms_ack - 1)
 // 					psymbol->st_size = 
 // 					(paout_syms + adr_reloc[rev_adr_reloc[idx]+1])->n_value - paout_sym->n_value;
 // 				else
@@ -661,7 +688,7 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 // 				if(sh_name_h.idx_bss != -1)
 // 					psymbol->st_shndx = sh_name_h.idx_bss;
 // 
-// 				if(rev_adr_reloc[idx] < cnt_syms_aout - 1)
+// 				if(rev_adr_reloc[idx] < cnt_syms_ack - 1)
 // 					psymbol->st_size = 
 // 					(paout_syms + adr_reloc[rev_adr_reloc[idx]+1])->n_value - paout_sym->n_value;
 // 				else
@@ -674,12 +701,12 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 // 				exit(-2);
 // 			break;
 // 		}
-// 	}
+	}
 
-	// cnt_symbols += cnt_syms_aout;
+	cnt_symbols += cnt_syms_ack;
 	pshdr_symtab->sh_info = first_glob_pos;
 
-	// pshdr_symtab->sh_size = sizeof(Elf32_Sym) * cnt_symbols;
+	pshdr_symtab->sh_size = sizeof(Elf32_Sym) * cnt_symbols;
 
 	len += sizeof(Elf32_Sym) * cnt_symbols;
 	str_len++;
@@ -714,7 +741,7 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 // 
 // 			int idx_sym = reloc[prel_aout->r_symbolnum] + last_sect_sym;
 // 
-// 			Elf32_Sym *p_sym = find_sym_by_addr(addr_code, aout_buf, obj,
+// 			Elf32_Sym *p_sym = find_sym_by_addr(addr_code, ack_buf, obj,
 // 								psymbols + last_sect_sym);
 // 			if(prel_aout->r_extern)
 // 			{
@@ -816,7 +843,7 @@ int convert(char *elf_buf, char *aout_buf, int *len_elf)
 // 			}
 // 			else
 // 			{
-// 				Elf32_Sym *p_sym = find_sym_by_addr(addr_code, aout_buf, obj,
+// 				Elf32_Sym *p_sym = find_sym_by_addr(addr_code, ack_buf, obj,
 // 								psymbols + last_sect_sym);
 // 
 // 				switch(prel_aout->r_symbolnum & N_TYPE)
@@ -913,21 +940,21 @@ int fileInOpen(char fname[])
 		return -1;
 	}
 
-	struct stat st; 
-	if(stat(fname, &st) != 0) 
-	{
-		printf("unable read permision for %s\n", fname);
-		close(fd_elf);
-		return -2;
-	}
-	st.st_mode |= S_IRWXU | S_IRWXG | S_IRWXO;
-
-	if(chmod(fname, st.st_mode) != 0)
-	{
-		printf("unable write permision for %s\n", fname);
-		close(fd_elf);
-		return -3;
-	}
+	// struct stat st; 
+	// if(stat(fname, &st) != 0) 
+	// {
+	// 	printf("unable read permision for %s\n", fname);
+	// 	close(fd_elf);
+	// 	return -2;
+	// }
+	// st.st_mode |= S_IRWXU | S_IRWXG | S_IRWXO;
+ // 
+	// if(chmod(fname, st.st_mode) != 0)
+	// {
+	// 	printf("unable write permision for %s\n", fname);
+	// 	close(fd_elf);
+	// 	return -3;
+	// }
 
 	return fd_elf;
 }
@@ -972,7 +999,7 @@ int main(int argc, char *argv[])
 		goto error1;
 	}
 
-	char *elf_buf = NULL, *aout_buf = NULL;
+	char *elf_buf = NULL, *ack_buf = NULL;
 
 	int aout_len = lseek(fd_aout, 0L, SEEK_END);
 	int elf_len_buff = 0x300000;
@@ -984,8 +1011,8 @@ int main(int argc, char *argv[])
 		goto error2;
 	}
 
-	aout_buf = (char *)malloc(sizeof(char) * aout_len);
-	if(!aout_buf)
+	ack_buf = (char *)malloc(sizeof(char) * aout_len);
+	if(!ack_buf)
 	{
 		printf("unable allocate memory of %d bytes\n", aout_len);
 		retval = -2;
@@ -1001,7 +1028,7 @@ int main(int argc, char *argv[])
 	}
 
 	lseek(fd_aout, 0, SEEK_SET);
-	if(read(fd_aout, aout_buf, aout_len) != aout_len)
+	if(read(fd_aout, ack_buf, aout_len) != aout_len)
 	{
 		printf("unable read from file %s\n", argv[1]);
 		retval = -2;
@@ -1010,9 +1037,9 @@ int main(int argc, char *argv[])
 
 	int len_elf = 0;
 
-	if(valid_magic(aout_buf))
+	if(valid_magic(ack_buf))
 	{
-		if(convert(elf_buf, aout_buf, &len_elf) != 0)
+		if(convert(elf_buf, ack_buf, &len_elf) != 0)
 		{
 			retval = -4;
 			goto error4;
@@ -1030,7 +1057,7 @@ int main(int argc, char *argv[])
 	error4:
 		free(elf_buf);
 	error3:
-		free(aout_buf);
+		free(ack_buf);
 	error2:
 		close(fd_elf);
 	error1:
